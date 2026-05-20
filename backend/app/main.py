@@ -1,21 +1,24 @@
 from __future__ import annotations
 
 import os
+import re
 from pathlib import Path
 from typing import List
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 
 from .agent import generate_plan
 from .models import AnalyzeRequest, ProjectPlan, TeamMember
-from .pdf_loader import extract_text_from_pdf_bytes
+from .pdf_loader import extract_text_from_pdf_bytes, extract_text_from_pdf_path
 from .team_loader import default_team, parse_team_members
 
 load_dotenv()
 
 DATA_DIR = Path(__file__).resolve().parents[2] / "data"
+PROJECTS_DIR = DATA_DIR / "projects"
 TEAM_FILE = DATA_DIR / "team_members.txt"
 
 app = FastAPI(
@@ -84,3 +87,62 @@ def create_plan(req: AnalyzeRequest) -> ProjectPlan:
     if not req.team:
         req.team = default_team()
     return generate_plan(req)
+
+
+# ---------------------------------------------------------------------------
+# Sample data endpoints — expose the EY challenge artefacts shipped in data/
+# ---------------------------------------------------------------------------
+
+_SAFE_KEY = re.compile(r"^[A-Za-z0-9_-]+$")
+
+
+def _sample_pdf_path(key: str) -> Path:
+    if not _SAFE_KEY.match(key):
+        raise HTTPException(400, "Invalid sample key.")
+    path = PROJECTS_DIR / f"{key}.pdf"
+    if not path.exists():
+        raise HTTPException(404, f"Sample '{key}' not found.")
+    # Defence in depth: ensure the resolved path stays inside PROJECTS_DIR.
+    if PROJECTS_DIR.resolve() not in path.resolve().parents:
+        raise HTTPException(400, "Invalid sample path.")
+    return path
+
+
+@app.get("/api/samples")
+def list_samples() -> List[dict]:
+    if not PROJECTS_DIR.exists():
+        return []
+    items = []
+    for pdf in sorted(PROJECTS_DIR.glob("*.pdf")):
+        items.append({
+            "key": pdf.stem,
+            "filename": pdf.name,
+            "size_bytes": pdf.stat().st_size,
+            "pdf_url": f"/api/samples/{pdf.stem}/pdf",
+            "text_url": f"/api/samples/{pdf.stem}/text",
+        })
+    return items
+
+
+@app.get("/api/samples/{key}/pdf")
+def get_sample_pdf(key: str) -> FileResponse:
+    path = _sample_pdf_path(key)
+    return FileResponse(path, media_type="application/pdf", filename=path.name)
+
+
+@app.get("/api/samples/{key}/text")
+def get_sample_text(key: str) -> dict:
+    path = _sample_pdf_path(key)
+    text = extract_text_from_pdf_path(path)
+    return {"key": key, "filename": path.name, "text": text, "chars": len(text)}
+
+
+@app.get("/api/team/raw")
+def get_team_raw() -> dict:
+    if not TEAM_FILE.exists():
+        return {"text": "", "exists": False, "filename": TEAM_FILE.name}
+    return {
+        "text": TEAM_FILE.read_text(encoding="utf-8"),
+        "exists": True,
+        "filename": TEAM_FILE.name,
+    }

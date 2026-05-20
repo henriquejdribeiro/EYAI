@@ -53,3 +53,23 @@ export function generatePlan(payload: {
     body: JSON.stringify(payload),
   });
 }
+
+export interface SampleProject {
+  key: string;
+  filename: string;
+  size_bytes: number;
+  pdf_url: string;
+  text_url: string;
+}
+
+export function listSamples(): Promise<SampleProject[]> {
+  return jsonFetch<SampleProject[]>(`${BASE}/samples`);
+}
+
+export function fetchSampleText(key: string): Promise<{ key: string; filename: string; text: string; chars: number }> {
+  return jsonFetch(`${BASE}/samples/${key}/text`);
+}
+
+export function fetchTeamRaw(): Promise<{ text: string; exists: boolean; filename: string }> {
+  return jsonFetch(`${BASE}/team/raw`);
+}

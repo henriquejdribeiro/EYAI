@@ -1,10 +1,14 @@
 import { useEffect, useState } from "react";
+import { GanttChart } from "./components/GanttChart";
 import { KanbanBoard } from "./components/KanbanBoard";
 import { ModeToggle, type Mode } from "./components/ModeToggle";
 import { ProjectInput } from "./components/ProjectInput";
+import { SampleDataPanel } from "./components/SampleDataPanel";
 import { TeamPanel } from "./components/TeamPanel";
 import { generatePlan, getHealth, getTeam } from "./lib/api";
 import type { HealthStatus, ProjectPlan, TaskStatus, TeamMember } from "./types";
+
+type BoardView = "kanban" | "gantt";
 
 const SAMPLE_TEXT = `Modernize the customer self-service portal for a mid-sized retail bank.\n\nObjectives:\n- Reduce contact-center call volume by 25% within 6 months.\n- Allow customers to manage cards, limits, beneficiaries, and statements online.\n- Comply with PSD2 strong-customer-authentication.\n\nConstraints:\n- Legacy core banking via SOAP only; no direct DB access.\n- Mobile-first; WCAG AA accessibility mandatory.\n- 12-week delivery window.`;
 
@@ -20,6 +24,14 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [mode, setMode] = useState<Mode>("auto");
+  const [boardView, setBoardView] = useState<BoardView>("kanban");
+
+  function handleUseSampleBrief(text: string, name: string) {
+    setProjectText(text);
+    setProjectName(name);
+    setPdfFile(null);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
 
   useEffect(() => {
     getHealth().then(setHealth).catch(() => setHealth(null));
@@ -79,6 +91,8 @@ export default function App() {
         </div>
       </header>
 
+      <SampleDataPanel onUseBrief={handleUseSampleBrief} />
+
       <div className="grid grid-2" style={{ marginBottom: 24 }}>
         <ProjectInput
           text={projectText}
@@ -121,7 +135,26 @@ export default function App() {
             </div>
           )}
           <ModeToggle mode={mode} onChange={setMode} />
-          <KanbanBoard plan={plan} mode={mode} onTaskStatusChange={handleTaskStatusChange} />
+
+          <div className="view-tabs">
+            <button
+              className={`view-tab ${boardView === "kanban" ? "active" : ""}`}
+              onClick={() => setBoardView("kanban")}
+            >
+              Kanban board
+            </button>
+            <button
+              className={`view-tab ${boardView === "gantt" ? "active" : ""}`}
+              onClick={() => setBoardView("gantt")}
+            >
+              Weekly timeline (Gantt)
+            </button>
+          </div>
+
+          {boardView === "kanban" && (
+            <KanbanBoard plan={plan} mode={mode} onTaskStatusChange={handleTaskStatusChange} />
+          )}
+          {boardView === "gantt" && <GanttChart plan={plan} />}
         </>
       )}
 
