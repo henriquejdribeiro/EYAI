@@ -77,9 +77,9 @@ export default function App() {
     <div className="app">
       <header className="header">
         <div className="brand">
-          <div className="brand-mark">SA</div>
+          <img src="/logo.svg" alt="ScrumAImaster" className="brand-logo" />
           <div>
-            <h1>Scrum Agent</h1>
+            <h1>ScrumAImaster</h1>
             <small>EY AI Challenge 2026 · Sprint planning, automated</small>
           </div>
         </div>
@@ -175,7 +175,7 @@ export default function App() {
       )}
 
       <footer style={{ marginTop: 40, textAlign: "center", color: "#747480", fontSize: "0.8rem" }}>
-        Scrum Agent · Built for EY AI Challenge 2026 · {new Date().getFullYear()}
+        ScrumAImaster · Built for EY AI Challenge 2026 · {new Date().getFullYear()}
       </footer>
     </div>
   );

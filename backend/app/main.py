@@ -129,10 +129,15 @@ def get_sample_pdf(key: str) -> FileResponse:
     path = _sample_pdf_path(key)
     # `inline` lets the browser embed the PDF in an iframe; passing `filename=`
     # to FileResponse would default to `attachment` and force a download.
+    # `no-cache` invalidates any stale earlier response that was served with
+    # the wrong Content-Disposition (which would force a download instead).
     return FileResponse(
         path,
         media_type="application/pdf",
-        headers={"Content-Disposition": f'inline; filename="{path.name}"'},
+        headers={
+            "Content-Disposition": f'inline; filename="{path.name}"',
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+        },
     )
 
 

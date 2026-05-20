@@ -35,6 +35,11 @@ export function SampleDataPanel({ onUseBrief }: Props) {
   }, []);
 
   const active = samples.find((s) => s.key === activeKey) ?? null;
+  // Append a per-session cache-buster so stale browser-cached responses
+  // (e.g. an earlier `Content-Disposition: attachment` that triggered a
+  // download) are bypassed without requiring a manual hard refresh.
+  const cacheBust = useState(() => Date.now())[0];
+  const activePdfUrl = active ? `${active.pdf_url}?v=${cacheBust}` : "";
 
   async function handleUseBrief(sample: SampleProject) {
     setLoadingBrief(sample.key);
@@ -98,10 +103,10 @@ export function SampleDataPanel({ onUseBrief }: Props) {
                   <div className="sample-preview-toolbar">
                     <strong style={{ fontSize: "0.85rem" }}>{active.filename}</strong>
                     <div className="pdf-preview-actions">
-                      <a className="btn-link" href={active.pdf_url} target="_blank" rel="noreferrer">
+                      <a className="btn-link" href={activePdfUrl} target="_blank" rel="noreferrer">
                         Open in tab
                       </a>
-                      <a className="btn-link" href={active.pdf_url} download={active.filename}>
+                      <a className="btn-link" href={activePdfUrl} download={active.filename}>
                         Download
                       </a>
                       <button
@@ -116,7 +121,7 @@ export function SampleDataPanel({ onUseBrief }: Props) {
                   <iframe
                     key={active.key}
                     title={`Sample: ${active.filename}`}
-                    src={active.pdf_url}
+                    src={activePdfUrl}
                     className="pdf-frame"
                   />
                 </div>

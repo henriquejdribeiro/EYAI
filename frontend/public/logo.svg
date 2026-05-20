@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" fill="none" stroke="#1FB54E" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round">
+  <title>ScrumAImaster logo — brain with AI chip</title>
+
+  <!-- Brain outer outline (top half + sides) -->
+  <path d="M70 100
+           C 65 80, 75 60, 92 60
+           C 95 50, 110 50, 113 60
+           C 130 60, 140 80, 135 100
+           C 142 105, 142 120, 132 122
+           C 132 130, 122 134, 115 130
+           L 115 138
+           L 90 138
+           L 90 130
+           C 83 134, 73 130, 73 122
+           C 63 120, 63 105, 70 100 Z" />
+
+  <!-- Hemisphere divider -->
+  <path d="M102 55 L 102 138" stroke-dasharray="2 3" stroke-width="2" />
+
+  <!-- Folds (suggest cortex) -->
+  <path d="M82 78 Q 90 84, 92 95 Q 88 102, 80 105" stroke-width="2" />
+  <path d="M85 110 Q 92 115, 92 125" stroke-width="2" />
+  <path d="M122 78 Q 114 84, 112 95 Q 116 102, 124 105" stroke-width="2" />
+  <path d="M119 110 Q 112 115, 112 125" stroke-width="2" />
+
+  <!-- AI chip -->
+  <rect x="83" y="142" width="38" height="28" rx="3" fill="#1FB54E" stroke="#1FB54E" />
+  <text x="102" y="162" text-anchor="middle"
+        font-family="ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Arial, sans-serif"
+        font-size="16" font-weight="800" fill="white" stroke="none">AI</text>
+
+  <!-- Circuit traces with terminator dots -->
+  <!-- left horizontal -->
+  <path d="M83 155 L 55 155 L 55 145" />
+  <circle cx="55" cy="142" r="3" fill="#1FB54E" stroke="none" />
+  <!-- right horizontal -->
+  <path d="M121 155 L 149 155 L 149 145" />
+  <circle cx="149" cy="142" r="3" fill="#1FB54E" stroke="none" />
+  <!-- bottom-left diagonal -->
+  <path d="M93 170 L 93 183 L 75 183" />
+  <circle cx="72" cy="183" r="3" fill="#1FB54E" stroke="none" />
+  <!-- bottom-right diagonal -->
+  <path d="M111 170 L 111 183 L 129 183" />
+  <circle cx="132" cy="183" r="3" fill="#1FB54E" stroke="none" />
+  <!-- bottom center -->
+  <path d="M102 170 L 102 188" />
+  <circle cx="102" cy="190" r="3" fill="#1FB54E" stroke="none" />
+</svg>
