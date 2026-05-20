@@ -11,6 +11,7 @@ interface Props {
   sprintLength: number;
   onSprintLengthChange: (n: number) => void;
   onGenerate: () => void;
+  onPdfFileChange: (file: File | null) => void;
   loading: boolean;
 }
 
@@ -23,6 +24,7 @@ export function ProjectInput(props: Props) {
     if (!file) return;
     setUploading(true);
     setUploadError(null);
+    props.onPdfFileChange(file);
     try {
       const res = await extractPdf(file);
       props.onTextChange(res.text);

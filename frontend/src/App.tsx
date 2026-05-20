@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { PdfPreview } from "./components/PdfPreview";
 import { ProjectInput } from "./components/ProjectInput";
 import { SprintBoard } from "./components/SprintBoard";
 import { TeamPanel } from "./components/TeamPanel";
@@ -17,6 +18,7 @@ export default function App() {
   const [plan, setPlan] = useState<ProjectPlan | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pdfFile, setPdfFile] = useState<File | null>(null);
 
   useEffect(() => {
     getHealth().then(setHealth).catch(() => setHealth(null));
@@ -72,10 +74,17 @@ export default function App() {
           sprintLength={sprintLength}
           onSprintLengthChange={setSprintLength}
           onGenerate={handleGenerate}
+          onPdfFileChange={setPdfFile}
           loading={loading}
         />
         <TeamPanel team={team} onTeamChange={setTeam} />
       </div>
+
+      {pdfFile && (
+        <div style={{ marginBottom: 24 }}>
+          <PdfPreview file={pdfFile} onClose={() => setPdfFile(null)} />
+        </div>
+      )}
 
       {error && <div className="error">{error}</div>}
 
