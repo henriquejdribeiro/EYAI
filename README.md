@@ -39,7 +39,7 @@ Built for the [EY AI Challenge 2026 — Scrum Agent](https://github.com/EY-AI-Ch
 .\scripts\dev.ps1
 ```
 
-This opens two PowerShell windows: one running the FastAPI backend on `:8000`, one running the Vite dev server on `:5173`. Open <http://127.0.0.1:5173>.
+This opens two PowerShell windows: one running the FastAPI backend on `:8001`, one running the Vite dev server on `:5173`. Open <http://127.0.0.1:5173>.
 
 ### Manual start
 
@@ -50,7 +50,7 @@ python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 copy .env.example .env   # then edit and add ANTHROPIC_API_KEY (optional)
-uvicorn app.main:app --reload --port 8000
+uvicorn app.main:app --reload --port 8001
 ```
 
 **Frontend**
@@ -82,7 +82,7 @@ scrum-agent/
 │   │   ├── lib/api.ts         REST client
 │   │   └── styles.css         EY-themed styling
 │   ├── package.json
-│   └── vite.config.ts         Proxies /api → :8000
+│   └── vite.config.ts         Proxies /api → :8001
 ├── data/
 │   ├── projects/              EY sample PDFs (Project1-3.pdf)
 │   └── team_members.txt       EY sample team
@@ -101,7 +101,7 @@ scrum-agent/
 | `POST` | `/api/projects/extract` | Multipart upload: extracts text from a PDF. |
 | `POST` | `/api/plan` | Body: `{project_text, project_name, sprint_count, sprint_length_days, team}`. Returns a full `ProjectPlan`. |
 
-Interactive docs at <http://127.0.0.1:8000/docs>.
+Interactive docs at <http://127.0.0.1:8001/docs>.
 
 ## Configuration
 
