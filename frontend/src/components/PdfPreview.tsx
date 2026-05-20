@@ -15,34 +15,32 @@ export function PdfPreview({ file, onClose }: Props) {
   const sizeKb = (file.size / 1024).toFixed(0);
 
   return (
-    <div className="card pdf-preview-card">
+    <div className="pdf-preview">
       <div className="pdf-preview-header">
         <div>
-          <h2 style={{ margin: 0 }}>PDF preview</h2>
-          <p style={{ margin: "2px 0 0", fontSize: "0.8rem", color: "#747480" }}>
+          <strong style={{ fontSize: "0.85rem" }}>PDF preview</strong>
+          <div style={{ fontSize: "0.75rem", color: "#747480" }}>
             {file.name} · {sizeKb} KB
-          </p>
+          </div>
         </div>
-        <div className="row" style={{ flex: "0 0 auto", gap: 8 }}>
+        <div className="pdf-preview-actions">
           <a
-            className="btn btn-ghost"
+            className="btn-link"
             href={blobUrl}
             download={file.name}
-            style={{ textDecoration: "none" }}
           >
             Download
           </a>
           <a
-            className="btn btn-ghost"
+            className="btn-link"
             href={blobUrl}
             target="_blank"
             rel="noreferrer"
-            style={{ textDecoration: "none" }}
           >
             Open in tab
           </a>
-          <button className="btn btn-ghost" onClick={onClose}>
-            Close preview
+          <button className="btn-link" onClick={onClose}>
+            Close
           </button>
         </div>
       </div>

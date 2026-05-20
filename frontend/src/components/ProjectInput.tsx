@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { extractPdf } from "../lib/api";
+import { PdfPreview } from "./PdfPreview";
 
 interface Props {
   text: string;
@@ -11,6 +12,7 @@ interface Props {
   sprintLength: number;
   onSprintLengthChange: (n: number) => void;
   onGenerate: () => void;
+  pdfFile: File | null;
   onPdfFileChange: (file: File | null) => void;
   loading: boolean;
 }
@@ -66,6 +68,12 @@ export function ProjectInput(props: Props) {
         onChange={(e) => props.onTextChange(e.target.value)}
         placeholder="Describe the project goals, scope, constraints, stakeholders, success criteria…"
       />
+
+      {props.pdfFile && (
+        <div style={{ marginTop: 12 }}>
+          <PdfPreview file={props.pdfFile} onClose={() => props.onPdfFileChange(null)} />
+        </div>
+      )}
 
       <div className="row" style={{ marginTop: 12 }}>
         <div>
