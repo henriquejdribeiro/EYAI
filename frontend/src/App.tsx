@@ -5,6 +5,7 @@ import { KanbanBoard } from "./components/KanbanBoard";
 import { ModeToggle, type Mode } from "./components/ModeToggle";
 import { ProjectInput } from "./components/ProjectInput";
 import { SampleDataPanel } from "./components/SampleDataPanel";
+import { TeamAllocatorPanel } from "./components/TeamAllocatorPanel";
 import { TeamPanel } from "./components/TeamPanel";
 import { generatePlan, getHealth, getTeam } from "./lib/api";
 import type { HealthStatus, ProjectPlan, TaskStatus, TeamMember } from "./types";
@@ -111,6 +112,13 @@ export default function App() {
         />
         <TeamPanel team={team} onTeamChange={setTeam} />
       </div>
+
+      <TeamAllocatorPanel
+        team={team}
+        currentProjectText={projectText}
+        currentProjectName={projectName}
+        onApplyTeam={setTeam}
+      />
 
       {error && <div className="error">{error}</div>}
 

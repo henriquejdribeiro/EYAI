@@ -2,13 +2,15 @@ from __future__ import annotations
 
 import os
 import re
+from collections import defaultdict
 from pathlib import Path
-from typing import List
+from typing import Dict, List
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
+from pydantic import BaseModel, Field
 
 from .agent import generate_plan
 from .models import AnalyzeRequest, ProjectPlan, TeamMember
@@ -156,4 +158,205 @@ def get_team_raw() -> dict:
         "text": TEAM_FILE.read_text(encoding="utf-8"),
         "exists": True,
         "filename": TEAM_FILE.name,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Team allocator — recommend the best team for one project (Modo 1) or
+# distribute the full roster across multiple projects simultaneously (Modo 2).
+# ---------------------------------------------------------------------------
+
+# Stopwords drop generic words that would otherwise dominate keyword overlap.
+_STOPWORDS = {
+    "the", "and", "for", "with", "that", "this", "from", "have", "has", "are",
+    "was", "were", "will", "would", "should", "could", "must", "into", "their",
+    "they", "them", "our", "out", "his", "her", "him", "she", "any", "all",
+    "more", "than", "also", "such", "but", "not", "yet", "use", "uses", "using",
+    "well", "make", "made", "across", "between", "ensuring", "ensure", "ensures",
+    "able", "experience", "years", "year", "work", "works", "working", "team",
+    "teams", "project", "projects", "system", "systems", "based", "strong",
+    "high", "highly", "good", "great", "include", "includes", "including",
+    "approach", "develop", "developing", "developed", "particularly", "very",
+    "what", "who", "whom", "how", "why", "when", "where",
+}
+
+
+def _tokenize(text: str) -> set[str]:
+    raw = re.findall(r"[a-zA-Z][a-zA-Z+\-./]{2,}", text.lower())
+    # Strip trailing punctuation (so "gdpr." -> "gdpr", "backend." -> "backend").
+    cleaned = (tok.rstrip(".-/") for tok in raw)
+    return {tok for tok in cleaned if len(tok) >= 3 and tok not in _STOPWORDS}
+
+
+def _member_tokens(member: TeamMember) -> set[str]:
+    tokens: set[str] = set()
+    tokens.update(_tokenize(member.role))
+    if member.seniority:
+        tokens.update(_tokenize(member.seniority))
+    for skill in member.skills:
+        tokens.update(_tokenize(skill))
+    return tokens
+
+
+def _score(member: TeamMember, project_tokens: set[str]) -> tuple[float, list[str]]:
+    """Return (score, matched_terms). Skill matches weighted higher than role-only."""
+    role_tokens = _tokenize(member.role) | _tokenize(member.seniority or "")
+    skill_tokens: set[str] = set()
+    for s in member.skills:
+        skill_tokens.update(_tokenize(s))
+
+    skill_hits = skill_tokens & project_tokens
+    role_hits = (role_tokens & project_tokens) - skill_hits
+    score = 2.0 * len(skill_hits) + 1.0 * len(role_hits)
+
+    matched = sorted(skill_hits) + sorted(role_hits)
+    return score, matched[:8]
+
+
+def _resolve_team(provided: List[TeamMember]) -> List[TeamMember]:
+    if provided:
+        return provided
+    if TEAM_FILE.exists():
+        parsed = parse_team_members(TEAM_FILE.read_text(encoding="utf-8"))
+        if parsed:
+            return parsed
+    return default_team()
+
+
+class RecommendRequest(BaseModel):
+    project_text: str
+    project_name: str = ""
+    team: List[TeamMember] = Field(default_factory=list)
+    top_n: int = 6
+
+
+class ProjectInput(BaseModel):
+    key: str
+    name: str = ""
+    text: str
+
+
+class AllocateRequest(BaseModel):
+    projects: List[ProjectInput]
+    team: List[TeamMember] = Field(default_factory=list)
+    min_per_project: int = 3
+
+
+@app.post("/api/team/recommend")
+def recommend_team(req: RecommendRequest) -> dict:
+    if not req.project_text or not req.project_text.strip():
+        raise HTTPException(400, "project_text is required.")
+    team = _resolve_team(req.team)
+    project_tokens = _tokenize(req.project_text)
+    ranked = []
+    for m in team:
+        score, matched = _score(m, project_tokens)
+        ranked.append({
+            "member": m.model_dump(mode="json"),
+            "score": score,
+            "matched_terms": matched,
+        })
+    ranked.sort(key=lambda r: r["score"], reverse=True)
+    max_score = max((r["score"] for r in ranked), default=1.0) or 1.0
+    for r in ranked:
+        r["normalized"] = r["score"] / max_score
+
+    recommended = ranked[: max(1, req.top_n)]
+    total_capacity = sum(r["member"]["capacity_hours_per_sprint"] for r in recommended)
+    return {
+        "project_name": req.project_name,
+        "ranked": ranked,
+        "recommended": recommended,
+        "recommended_team_capacity": total_capacity,
+        "project_keywords": sorted(project_tokens)[:25],
+    }
+
+
+@app.post("/api/team/allocate")
+def allocate_team(req: AllocateRequest) -> dict:
+    if len(req.projects) < 2:
+        raise HTTPException(400, "At least two projects are required to allocate.")
+    team = _resolve_team(req.team)
+
+    project_tokens = {p.key: _tokenize(p.text) for p in req.projects}
+    score_matrix: Dict[str, Dict[str, float]] = {}
+    matched_matrix: Dict[str, Dict[str, list[str]]] = {}
+    for m in team:
+        score_matrix[m.id] = {}
+        matched_matrix[m.id] = {}
+        for p in req.projects:
+            score, matched = _score(m, project_tokens[p.key])
+            score_matrix[m.id][p.key] = score
+            matched_matrix[m.id][p.key] = matched
+
+    # Step 1: greedy — assign each member to the project where they fit best.
+    assignments: Dict[str, list] = defaultdict(list)
+    member_assignment: Dict[str, str] = {}
+    for m in team:
+        scores = score_matrix[m.id]
+        # Tie-breaker: project with fewer members so far gets priority.
+        best_key = max(
+            scores.keys(),
+            key=lambda k: (scores[k], -len(assignments[k])),
+        )
+        assignments[best_key].append(m)
+        member_assignment[m.id] = best_key
+
+    # Step 2: rebalance — if any project is below min_per_project, pull from
+    # surplus projects starting with the member whose score-loss is smallest.
+    def project_size(k: str) -> int:
+        return len(assignments[k])
+
+    project_keys = [p.key for p in req.projects]
+    changed = True
+    while changed:
+        changed = False
+        understaffed = [k for k in project_keys if project_size(k) < req.min_per_project]
+        if not understaffed:
+            break
+        for under_k in understaffed:
+            # Find the surplus project with the best candidate to give away.
+            best_swap: tuple[float, str, str] | None = None  # (loss, member_id, donor_key)
+            for donor_k in project_keys:
+                if donor_k == under_k or project_size(donor_k) <= req.min_per_project:
+                    continue
+                for m in assignments[donor_k]:
+                    loss = score_matrix[m.id][donor_k] - score_matrix[m.id][under_k]
+                    if best_swap is None or loss < best_swap[0]:
+                        best_swap = (loss, m.id, donor_k)
+            if best_swap is None:
+                break  # can't satisfy this one without dropping another below min
+            _loss, mid, donor_k = best_swap
+            moved = next(x for x in assignments[donor_k] if x.id == mid)
+            assignments[donor_k].remove(moved)
+            assignments[under_k].append(moved)
+            member_assignment[mid] = under_k
+            changed = True
+
+    out: Dict[str, dict] = {}
+    for p in req.projects:
+        members = assignments[p.key]
+        rows = []
+        for m in members:
+            rows.append({
+                "member": m.model_dump(mode="json"),
+                "score": score_matrix[m.id][p.key],
+                "matched_terms": matched_matrix[m.id][p.key],
+                "alternates": {
+                    k: score_matrix[m.id][k] for k in project_keys if k != p.key
+                },
+            })
+        rows.sort(key=lambda r: r["score"], reverse=True)
+        out[p.key] = {
+            "name": p.name or p.key,
+            "members": rows,
+            "total_capacity_hours": sum(r["member"]["capacity_hours_per_sprint"] for r in rows),
+            "avg_score": (sum(r["score"] for r in rows) / len(rows)) if rows else 0.0,
+        }
+
+    return {
+        "assignments": out,
+        "total_members": len(team),
+        "min_per_project": req.min_per_project,
+        "algorithm": "greedy best-fit, then rebalance to satisfy min-per-project by smallest score loss",
     }

@@ -73,3 +73,68 @@ export function fetchSampleText(key: string): Promise<{ key: string; filename: s
 export function fetchTeamRaw(): Promise<{ text: string; exists: boolean; filename: string }> {
   return jsonFetch(`${BASE}/team/raw`);
 }
+
+export interface RecommendItem {
+  member: TeamMember;
+  score: number;
+  matched_terms: string[];
+  normalized?: number;
+}
+
+export interface RecommendResponse {
+  project_name: string;
+  ranked: RecommendItem[];
+  recommended: RecommendItem[];
+  recommended_team_capacity: number;
+  project_keywords: string[];
+}
+
+export function recommendTeam(payload: {
+  project_text: string;
+  project_name?: string;
+  team?: TeamMember[];
+  top_n?: number;
+}): Promise<RecommendResponse> {
+  return jsonFetch<RecommendResponse>(`${BASE}/team/recommend`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export interface AllocateProjectInput {
+  key: string;
+  name: string;
+  text: string;
+}
+
+export interface AllocateMember {
+  member: TeamMember;
+  score: number;
+  matched_terms: string[];
+  alternates: Record<string, number>;
+}
+
+export interface AllocateProjectResult {
+  name: string;
+  members: AllocateMember[];
+  total_capacity_hours: number;
+  avg_score: number;
+}
+
+export interface AllocateResponse {
+  assignments: Record<string, AllocateProjectResult>;
+  total_members: number;
+  min_per_project: number;
+  algorithm: string;
+}
+
+export function allocateTeam(payload: {
+  projects: AllocateProjectInput[];
+  team?: TeamMember[];
+  min_per_project?: number;
+}): Promise<AllocateResponse> {
+  return jsonFetch<AllocateResponse>(`${BASE}/team/allocate`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
