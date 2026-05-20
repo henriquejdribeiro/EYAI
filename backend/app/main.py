@@ -9,12 +9,13 @@ from typing import Dict, List
 from dotenv import load_dotenv
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel, Field
 
 from .agent import generate_plan
 from .models import AnalyzeRequest, ProjectPlan, TeamMember
 from .pdf_loader import extract_text_from_pdf_bytes, extract_text_from_pdf_path
+from .pdf_report import build_allocate_pdf, build_recommend_pdf
 from .team_loader import default_team, parse_team_members
 
 load_dotenv()
@@ -242,8 +243,7 @@ class AllocateRequest(BaseModel):
     min_per_project: int = 3
 
 
-@app.post("/api/team/recommend")
-def recommend_team(req: RecommendRequest) -> dict:
+def _compute_recommendation(req: RecommendRequest) -> dict:
     if not req.project_text or not req.project_text.strip():
         raise HTTPException(400, "project_text is required.")
     team = _resolve_team(req.team)
@@ -265,6 +265,7 @@ def recommend_team(req: RecommendRequest) -> dict:
     total_capacity = sum(r["member"]["capacity_hours_per_sprint"] for r in recommended)
     return {
         "project_name": req.project_name,
+        "project_text": req.project_text,
         "ranked": ranked,
         "recommended": recommended,
         "recommended_team_capacity": total_capacity,
@@ -272,8 +273,37 @@ def recommend_team(req: RecommendRequest) -> dict:
     }
 
 
-@app.post("/api/team/allocate")
-def allocate_team(req: AllocateRequest) -> dict:
+@app.post("/api/team/recommend")
+def recommend_team(req: RecommendRequest) -> dict:
+    payload = _compute_recommendation(req)
+    payload.pop("project_text", None)  # JSON callers already have it
+    return payload
+
+
+@app.post("/api/team/recommend/pdf")
+def recommend_team_pdf(req: RecommendRequest) -> Response:
+    payload = _compute_recommendation(req)
+    pdf_bytes = build_recommend_pdf(
+        project_name=payload["project_name"],
+        project_text=payload["project_text"],
+        ranked=payload["ranked"],
+        recommended=payload["recommended"],
+        recommended_team_capacity=payload["recommended_team_capacity"],
+        project_keywords=payload["project_keywords"],
+    )
+    safe_name = re.sub(r"[^A-Za-z0-9_-]", "_", payload["project_name"] or "project")[:40]
+    filename = f"ScrumAImaster_Modo1_{safe_name}.pdf"
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+        },
+    )
+
+
+def _compute_allocation(req: AllocateRequest) -> dict:
     if len(req.projects) < 2:
         raise HTTPException(400, "At least two projects are required to allocate.")
     team = _resolve_team(req.team)
@@ -360,3 +390,28 @@ def allocate_team(req: AllocateRequest) -> dict:
         "min_per_project": req.min_per_project,
         "algorithm": "greedy best-fit, then rebalance to satisfy min-per-project by smallest score loss",
     }
+
+
+@app.post("/api/team/allocate")
+def allocate_team(req: AllocateRequest) -> dict:
+    return _compute_allocation(req)
+
+
+@app.post("/api/team/allocate/pdf")
+def allocate_team_pdf(req: AllocateRequest) -> Response:
+    payload = _compute_allocation(req)
+    pdf_bytes = build_allocate_pdf(
+        assignments=payload["assignments"],
+        total_members=payload["total_members"],
+        min_per_project=payload["min_per_project"],
+        algorithm=payload["algorithm"],
+    )
+    filename = f"ScrumAImaster_Modo2_allocation_{len(payload['assignments'])}_projects.pdf"
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+        },
+    )

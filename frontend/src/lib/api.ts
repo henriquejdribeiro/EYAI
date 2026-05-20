@@ -138,3 +138,45 @@ export function allocateTeam(payload: {
     body: JSON.stringify(payload),
   });
 }
+
+async function downloadPdf(url: string, body: unknown, fallbackFilename: string): Promise<void> {
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const detail = await res.text().catch(() => "");
+    throw new Error(`${res.status} ${res.statusText} — ${detail}`);
+  }
+  // Try to pull the server-suggested filename from Content-Disposition.
+  const disp = res.headers.get("content-disposition") ?? "";
+  const match = /filename="?([^";]+)"?/i.exec(disp);
+  const filename = match?.[1] ?? fallbackFilename;
+  const blob = await res.blob();
+  const blobUrl = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = blobUrl;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(blobUrl), 0);
+}
+
+export function downloadRecommendPdf(payload: {
+  project_text: string;
+  project_name?: string;
+  team?: TeamMember[];
+  top_n?: number;
+}): Promise<void> {
+  return downloadPdf(`${BASE}/team/recommend/pdf`, payload, "ScrumAImaster_Modo1.pdf");
+}
+
+export function downloadAllocatePdf(payload: {
+  projects: AllocateProjectInput[];
+  team?: TeamMember[];
+  min_per_project?: number;
+}): Promise<void> {
+  return downloadPdf(`${BASE}/team/allocate/pdf`, payload, "ScrumAImaster_Modo2.pdf");
+}

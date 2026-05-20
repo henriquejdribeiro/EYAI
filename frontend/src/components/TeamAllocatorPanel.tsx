@@ -1,9 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   allocateTeam,
+  downloadAllocatePdf,
+  downloadRecommendPdf,
   fetchSampleText,
   listSamples,
   recommendTeam,
+  type AllocateProjectInput,
   type AllocateResponse,
   type RecommendResponse,
   type SampleProject,
@@ -39,12 +42,16 @@ export function TeamAllocatorPanel({ team, currentProjectText, currentProjectNam
   const [singleResult, setSingleResult] = useState<RecommendResponse | null>(null);
   const [singleLoading, setSingleLoading] = useState(false);
   const [singleError, setSingleError] = useState<string | null>(null);
+  const [singleInput, setSingleInput] = useState<{ text: string; name: string } | null>(null);
+  const [singlePdfLoading, setSinglePdfLoading] = useState(false);
 
   // Multi-project mode state
   const [multiResult, setMultiResult] = useState<AllocateResponse | null>(null);
   const [multiLoading, setMultiLoading] = useState(false);
   const [multiError, setMultiError] = useState<string | null>(null);
   const [minPerProject, setMinPerProject] = useState(4);
+  const [multiInput, setMultiInput] = useState<AllocateProjectInput[] | null>(null);
+  const [multiPdfLoading, setMultiPdfLoading] = useState(false);
 
   useEffect(() => {
     listSamples().then(setSamples).catch(() => setSamples([]));
@@ -72,10 +79,29 @@ export function TeamAllocatorPanel({ team, currentProjectText, currentProjectNam
         top_n: 6,
       });
       setSingleResult(result);
+      setSingleInput({ text, name });
     } catch (err) {
       setSingleError(String(err));
     } finally {
       setSingleLoading(false);
+    }
+  }
+
+  async function downloadSinglePdf() {
+    if (!singleInput) return;
+    setSinglePdfLoading(true);
+    setSingleError(null);
+    try {
+      await downloadRecommendPdf({
+        project_text: singleInput.text,
+        project_name: singleInput.name,
+        team,
+        top_n: 6,
+      });
+    } catch (err) {
+      setSingleError(String(err));
+    } finally {
+      setSinglePdfLoading(false);
     }
   }
 
@@ -95,10 +121,24 @@ export function TeamAllocatorPanel({ team, currentProjectText, currentProjectNam
       );
       const result = await allocateTeam({ projects, team, min_per_project: minPerProject });
       setMultiResult(result);
+      setMultiInput(projects);
     } catch (err) {
       setMultiError(String(err));
     } finally {
       setMultiLoading(false);
+    }
+  }
+
+  async function downloadMultiPdf() {
+    if (!multiInput) return;
+    setMultiPdfLoading(true);
+    setMultiError(null);
+    try {
+      await downloadAllocatePdf({ projects: multiInput, team, min_per_project: minPerProject });
+    } catch (err) {
+      setMultiError(String(err));
+    } finally {
+      setMultiPdfLoading(false);
     }
   }
 
@@ -201,13 +241,23 @@ export function TeamAllocatorPanel({ team, currentProjectText, currentProjectNam
                 })}
               </div>
 
-              <button
-                className="btn btn-primary"
-                style={{ marginTop: 16 }}
-                onClick={() => onApplyTeam(singleResult.recommended.map((r) => r.member))}
-              >
-                Apply recommended team to roster
-              </button>
+              <div className="row" style={{ marginTop: 16, gap: 8 }}>
+                <button
+                  className="btn btn-primary"
+                  onClick={() => onApplyTeam(singleResult.recommended.map((r) => r.member))}
+                  style={{ flex: "0 0 auto" }}
+                >
+                  Apply recommended team to roster
+                </button>
+                <button
+                  className="btn btn-ghost"
+                  onClick={downloadSinglePdf}
+                  disabled={singlePdfLoading}
+                  style={{ flex: "0 0 auto" }}
+                >
+                  {singlePdfLoading ? "Building PDF…" : "Download PDF report"}
+                </button>
+              </div>
             </div>
           )}
         </div>
@@ -246,6 +296,16 @@ export function TeamAllocatorPanel({ team, currentProjectText, currentProjectNam
                 <span><strong>{multiResult.total_members}</strong> members allocated</span>
                 <span><strong>{Object.keys(multiResult.assignments).length}</strong> projects</span>
                 <span className="alloc-keywords">Algorithm: {multiResult.algorithm}</span>
+              </div>
+
+              <div style={{ marginBottom: 12 }}>
+                <button
+                  className="btn btn-ghost"
+                  onClick={downloadMultiPdf}
+                  disabled={multiPdfLoading}
+                >
+                  {multiPdfLoading ? "Building PDF…" : "Download PDF report"}
+                </button>
               </div>
 
               <div className="alloc-multi-grid">
