@@ -127,7 +127,13 @@ def list_samples() -> List[dict]:
 @app.get("/api/samples/{key}/pdf")
 def get_sample_pdf(key: str) -> FileResponse:
     path = _sample_pdf_path(key)
-    return FileResponse(path, media_type="application/pdf", filename=path.name)
+    # `inline` lets the browser embed the PDF in an iframe; passing `filename=`
+    # to FileResponse would default to `attachment` and force a download.
+    return FileResponse(
+        path,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'inline; filename="{path.name}"'},
+    )
 
 
 @app.get("/api/samples/{key}/text")

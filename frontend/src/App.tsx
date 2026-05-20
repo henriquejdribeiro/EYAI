@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { BacklogView } from "./components/BacklogView";
 import { GanttChart } from "./components/GanttChart";
 import { KanbanBoard } from "./components/KanbanBoard";
 import { ModeToggle, type Mode } from "./components/ModeToggle";
@@ -8,7 +9,7 @@ import { TeamPanel } from "./components/TeamPanel";
 import { generatePlan, getHealth, getTeam } from "./lib/api";
 import type { HealthStatus, ProjectPlan, TaskStatus, TeamMember } from "./types";
 
-type BoardView = "kanban" | "gantt";
+type BoardView = "backlog" | "kanban" | "gantt";
 
 const SAMPLE_TEXT = `Modernize the customer self-service portal for a mid-sized retail bank.\n\nObjectives:\n- Reduce contact-center call volume by 25% within 6 months.\n- Allow customers to manage cards, limits, beneficiaries, and statements online.\n- Comply with PSD2 strong-customer-authentication.\n\nConstraints:\n- Legacy core banking via SOAP only; no direct DB access.\n- Mobile-first; WCAG AA accessibility mandatory.\n- 12-week delivery window.`;
 
@@ -24,7 +25,7 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [mode, setMode] = useState<Mode>("auto");
-  const [boardView, setBoardView] = useState<BoardView>("kanban");
+  const [boardView, setBoardView] = useState<BoardView>("backlog");
 
   function handleUseSampleBrief(text: string, name: string) {
     setProjectText(text);
@@ -138,19 +139,26 @@ export default function App() {
 
           <div className="view-tabs">
             <button
+              className={`view-tab ${boardView === "backlog" ? "active" : ""}`}
+              onClick={() => setBoardView("backlog")}
+            >
+              Backlog
+            </button>
+            <button
               className={`view-tab ${boardView === "kanban" ? "active" : ""}`}
               onClick={() => setBoardView("kanban")}
             >
-              Kanban board
+              Board (kanban)
             </button>
             <button
               className={`view-tab ${boardView === "gantt" ? "active" : ""}`}
               onClick={() => setBoardView("gantt")}
             >
-              Weekly timeline (Gantt)
+              Timeline (Gantt)
             </button>
           </div>
 
+          {boardView === "backlog" && <BacklogView plan={plan} />}
           {boardView === "kanban" && (
             <KanbanBoard plan={plan} mode={mode} onTaskStatusChange={handleTaskStatusChange} />
           )}
