@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
+import { KanbanBoard } from "./components/KanbanBoard";
+import { ModeToggle, type Mode } from "./components/ModeToggle";
 import { ProjectInput } from "./components/ProjectInput";
-import { SprintBoard } from "./components/SprintBoard";
 import { TeamPanel } from "./components/TeamPanel";
 import { generatePlan, getHealth, getTeam } from "./lib/api";
-import type { HealthStatus, ProjectPlan, TeamMember } from "./types";
+import type { HealthStatus, ProjectPlan, TaskStatus, TeamMember } from "./types";
 
 const SAMPLE_TEXT = `Modernize the customer self-service portal for a mid-sized retail bank.\n\nObjectives:\n- Reduce contact-center call volume by 25% within 6 months.\n- Allow customers to manage cards, limits, beneficiaries, and statements online.\n- Comply with PSD2 strong-customer-authentication.\n\nConstraints:\n- Legacy core banking via SOAP only; no direct DB access.\n- Mobile-first; WCAG AA accessibility mandatory.\n- 12-week delivery window.`;
 
@@ -18,6 +19,7 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pdfFile, setPdfFile] = useState<File | null>(null);
+  const [mode, setMode] = useState<Mode>("auto");
 
   useEffect(() => {
     getHealth().then(setHealth).catch(() => setHealth(null));
@@ -41,6 +43,21 @@ export default function App() {
     } finally {
       setLoading(false);
     }
+  }
+
+  function handleTaskStatusChange(taskId: string, status: TaskStatus) {
+    setPlan((current) => {
+      if (!current) return current;
+      return {
+        ...current,
+        user_stories: current.user_stories.map((story) => ({
+          ...story,
+          tasks: story.tasks.map((task) =>
+            task.id === taskId ? { ...task, status } : task,
+          ),
+        })),
+      };
+    });
   }
 
   return (
@@ -89,7 +106,24 @@ export default function App() {
         </div>
       )}
 
-      {plan && !loading && <SprintBoard plan={plan} />}
+      {plan && !loading && (
+        <>
+          <div className="summary-box">
+            <h2>{plan.project_name}</h2>
+            <p>{plan.summary}</p>
+          </div>
+          {plan.risks.length > 0 && (
+            <div className="card" style={{ marginBottom: 16 }}>
+              <h3>Risks identified</h3>
+              <ul className="risk-list">
+                {plan.risks.map((r, i) => <li key={i}>{r}</li>)}
+              </ul>
+            </div>
+          )}
+          <ModeToggle mode={mode} onChange={setMode} />
+          <KanbanBoard plan={plan} mode={mode} onTaskStatusChange={handleTaskStatusChange} />
+        </>
+      )}
 
       {!plan && !loading && (
         <div className="card">
